@@ -1,8 +1,10 @@
 # My Life
 
-Личное мобильное приложение для планирования жизни: задачи на сегодня, цели, привычки и сферы (здоровье, карьера, финансы…).
+Личное мобильное приложение для планирования жизни: задачи, календарь, расходы, привычки, цели и уведомления.
 
-Стек: **Expo (React Native) + TypeScript**. Данные пока хранятся локально на устройстве.
+Стек: **Expo (React Native) + TypeScript**. Данные локально (AsyncStorage). OTA через **EAS Update**.
+
+Проект Expo: https://expo.dev/accounts/mehebbet55/projects/my-life
 
 ## Запуск у себя
 
@@ -12,45 +14,44 @@ npm install
 npx expo start
 ```
 
-Отсканируй QR в приложении **Expo Go** на iPhone.
+Отсканируй QR в **Expo Go** на iPhone (тот же аккаунт Expo).
 
-## Структура
+## Вкладки
 
-- `src/screens` — Сегодня / Цели / Привычки / Сферы
-- `src/context` — состояние и сохранение
-- `src/lib/api.ts` — клиент будущего API на твоём сервере
-- `server/` — заготовка бэкенда
+- Сегодня — обзор дня
+- Задачи — todo с приоритетами и напоминаниями
+- Календарь — события + дедлайны
+- Расходы — категории и итоги месяца
+- Ещё — цели, привычки, сферы, уведомления, OTA
 
-## TestFlight (только для себя)
+## OTA-обновления (без новой сборки)
 
-Нужны:
-
-1. **Apple Developer Program** (~$99/год) — без него TestFlight недоступен.
-2. Аккаунт [Expo](https://expo.dev) и CLI: `npm i -g eas-cli`
-3. Mac **не обязателен** для сборки — EAS Build собирает в облаке.
-
-Шаги:
+После первой сборки TestFlight / preview можно пушить JS-изменения:
 
 ```bash
-npm i -g eas-cli
-eas login
-eas build:configure
-eas build --platform ios --profile production
-eas submit --platform ios --latest
+# preview-канал
+npx eas-cli update --channel preview --environment preview --message "описание"
+
+# production (TestFlight / store)
+npx eas-cli update --channel production --environment production --message "описание"
 ```
 
-В App Store Connect создай приложение с bundle id `com.personal.mylife`,
-добавь себя как внутреннего тестера TestFlight.
+В приложении: **Ещё → Обновления (OTA)** — проверка вручную. При запуске баннер «Доступно обновление».
 
-Пока нет Apple Developer — можно пользоваться через **Expo Go**.
+> В Expo Go OTA не применяется — только в standalone / TestFlight сборке.
+
+`runtimeVersion` = `appVersion` (сейчас `1.0.0`). При смене native-зависимостей подними `version` в `app.json` и сделай новый build.
+
+## TestFlight
+
+1. Apple Developer Program
+2. `npx eas-cli build --platform ios --profile production`
+3. `npx eas-cli submit --platform ios --latest`
+
+Bundle id: `com.mylife.planner`
 
 ## GitHub
 
-Репозиторий: создай на github.com репозиторий `my-life` (private) и:
-
 ```bash
-git remote add origin https://github.com/<твой-логин>/my-life.git
-git push -u origin main
+gh repo create my-life --private --source=. --remote=origin --push
 ```
-
-(`gh` на этой машине пока не установлен — можно поставить: `winget install GitHub.cli`)

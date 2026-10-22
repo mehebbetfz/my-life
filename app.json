@@ -7,15 +7,30 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "scheme": "mylife",
+    "owner": "mehebbet55",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/a05816b9-5ff9-46b1-9eac-21eaaf02eb63",
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0
+    },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.personal.mylife",
-      "buildNumber": "1"
+      "bundleIdentifier": "com.mylife.planner",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "UIBackgroundModes": [
+          "remote-notification",
+          "audio"
+        ]
+      }
     },
     "android": {
-      "package": "com.personal.mylife",
+      "package": "com.mylife.planner",
       "adaptiveIcon": {
-        "backgroundColor": "#F7F4EF",
+        "backgroundColor": "#000000",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -27,8 +42,37 @@
     },
     "extra": {
       "eas": {
-        "projectId": ""
+        "projectId": "a05816b9-5ff9-46b1-9eac-21eaaf02eb63"
       }
-    }
+    },
+    "plugins": [
+      "expo-dev-client",
+      "expo-status-bar",
+      "@react-native-community/datetimepicker",
+      "expo-document-picker",
+      "expo-file-system",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#EA4B71",
+          "sounds": [
+            "./assets/sounds/classic.wav",
+            "./assets/sounds/soft.wav",
+            "./assets/sounds/bright.wav",
+            "./assets/sounds/pulse.wav"
+          ]
+        }
+      ],
+      [
+        "expo-audio",
+        {
+          "enableBackgroundPlayback": true
+        }
+      ],
+      "expo-updates",
+      "expo-font",
+      "expo-asset"
+    ]
   }
 }

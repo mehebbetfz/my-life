@@ -1,8 +1,8 @@
 import React, { useMemo } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
-import { Screen, Subtitle, Title } from '../components/ui';
+import { EmptyHint, Header, Screen } from '../components/ui';
 import { useData } from '../context/DataContext';
-import { colors } from '../theme';
+import { colors, fonts, radii, space } from '../theme';
 import { LIFE_AREAS } from '../types';
 
 export function AreasScreen() {
@@ -13,95 +13,92 @@ export function AreasScreen() {
       LIFE_AREAS.map((area) => {
         const goals = data.goals.filter((g) => g.areaId === area.id);
         const habits = data.habits.filter((h) => h.areaId === area.id);
-        const tasks = data.tasks.filter((t) => t.areaId === area.id && !t.done);
+        const tasks = data.tasks.filter(
+          (t) => t.areaId === area.id && !t.done,
+        );
         return {
           area,
           goalsOpen: goals.filter((g) => !g.done).length,
           goalsDone: goals.filter((g) => g.done).length,
           habits: habits.length,
           tasksOpen: tasks.length,
+          total:
+            goals.filter((g) => !g.done).length +
+            habits.length +
+            tasks.length,
         };
       }),
     [data],
   );
 
-  return (
-    <Screen style={{ paddingHorizontal: 0 }}>
-      <View style={{ paddingHorizontal: 20 }}>
-        <Title>Сферы</Title>
-        <Subtitle>Баланс жизни — где сейчас больше внимания</Subtitle>
-      </View>
+  const max = Math.max(1, ...stats.map((s) => s.total));
 
-      <ScrollView contentContainerStyle={styles.list}>
-        {stats.map(({ area, goalsOpen, goalsDone, habits, tasksOpen }) => {
-          const total = goalsOpen + habits + tasksOpen;
-          return (
-            <View
-              key={area.id}
-              style={[styles.card, { borderLeftColor: area.color }]}
-            >
-              <Text style={styles.cardTitle}>{area.title}</Text>
-              <Text style={styles.cardMeta}>
-                {goalsOpen} целей · {habits} привычек · {tasksOpen} задач
-              </Text>
-              <View style={styles.barTrack}>
-                <View
-                  style={[
-                    styles.barFill,
-                    {
-                      backgroundColor: area.color,
-                      width: `${Math.min(100, total * 12)}%`,
-                    },
-                  ]}
-                />
-              </View>
-              {goalsDone > 0 && (
-                <Text style={styles.doneHint}>Закрыто целей: {goalsDone}</Text>
-              )}
+  return (
+    <Screen>
+      <Header title="Сферы" subtitle="Куда уходит внимание" />
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 40 }}
+      >
+        {stats.every((s) => s.total === 0) ? (
+          <EmptyHint>Пока пусто — добавь цели или задачи.</EmptyHint>
+        ) : null}
+        {stats.map(({ area, goalsOpen, habits, tasksOpen, goalsDone, total }) => (
+          <View key={area.id} style={styles.card}>
+            <View style={styles.top}>
+              <View
+                style={[styles.swatch, { backgroundColor: area.color }]}
+              />
+              <Text style={styles.title}>{area.title}</Text>
             </View>
-          );
-        })}
+            <Text style={styles.meta}>
+              {goalsOpen} целей · {habits} привычек · {tasksOpen} задач
+              {goalsDone > 0 ? ` · закрыто ${goalsDone}` : ''}
+            </Text>
+            <View style={styles.track}>
+              <View
+                style={[
+                  styles.fill,
+                  {
+                    backgroundColor: area.color,
+                    width: `${(total / max) * 100}%`,
+                  },
+                ]}
+              />
+            </View>
+          </View>
+        ))}
       </ScrollView>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  list: { paddingHorizontal: 20, paddingBottom: 40 },
   card: {
     backgroundColor: colors.surface,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: colors.line,
-    borderLeftWidth: 4,
-    padding: 16,
-    marginBottom: 12,
+    borderRadius: radii.lg,
+    padding: space.lg,
+    marginBottom: space.sm,
   },
-  cardTitle: {
-    fontSize: 18,
-    fontWeight: '700',
+  top: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  swatch: { width: 10, height: 10, borderRadius: 5 },
+  title: {
+    fontFamily: fonts.sansSemi,
+    fontSize: 17,
     color: colors.ink,
   },
-  cardMeta: {
-    marginTop: 4,
+  meta: {
+    marginTop: 6,
+    fontFamily: fonts.sans,
     fontSize: 13,
     color: colors.muted,
   },
-  barTrack: {
+  track: {
     marginTop: 12,
-    height: 6,
-    borderRadius: 3,
+    height: 4,
+    borderRadius: 2,
     backgroundColor: colors.line,
     overflow: 'hidden',
   },
-  barFill: {
-    height: '100%',
-    borderRadius: 3,
-  },
-  doneHint: {
-    marginTop: 8,
-    fontSize: 12,
-    color: colors.success,
-    fontWeight: '600',
-  },
+  fill: { height: '100%', borderRadius: 2 },
 });

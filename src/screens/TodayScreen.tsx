@@ -1,189 +1,248 @@
-import React, { useMemo, useState } from 'react';
-import { Alert, FlatList, StyleSheet, Text, View } from 'react-native';
+import React, { useMemo } from 'react';
+import { Alert, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import {
-  Chip,
+  PriorityFlag,
+  priorityMeta,
+} from '../components/PriorityPicker';
+import {
+  Check,
   EmptyHint,
-  Field,
-  PrimaryButton,
+  Header,
   Row,
   Screen,
-  Subtitle,
-  Title,
+  SectionLabel,
 } from '../components/ui';
 import { useData } from '../context/DataContext';
-import { todayIso } from '../lib/storage';
-import { colors } from '../theme';
-import { LIFE_AREAS, type LifeAreaId } from '../types';
+import { DEFAULT_BASE_CURRENCY } from '../lib/currency';
+import { isHabitOkOn } from '../lib/habits';
+import { formatMoney, monthKey, todayIso } from '../lib/storage';
+import { colors, fonts, radii, space } from '../theme';
+import { LIFE_AREAS } from '../types';
 
 export function TodayScreen() {
-  const { data, addTask, toggleTask, removeTask, toggleHabitToday } = useData();
-  const [title, setTitle] = useState('');
-  const [areaId, setAreaId] = useState<LifeAreaId | undefined>();
-
+  const { data, toggleTask, markHabitMiss, clearHabitMiss } = useData();
+  const baseCurrency = data.baseCurrency ?? DEFAULT_BASE_CURRENCY;
   const today = todayIso();
-  const tasks = useMemo(
+  const month = today.slice(0, 7);
+
+  const openTasks = useMemo(
     () =>
-      data.tasks.filter(
-        (t) => !t.dueDate || t.dueDate === today || !t.done,
-      ),
+      data.tasks
+        .filter((t) => !t.done && (!t.dueDate || t.dueDate <= today))
+        .slice(0, 6),
     [data.tasks, today],
   );
 
-  const openTasks = tasks.filter((t) => !t.done);
-  const doneTasks = tasks.filter((t) => t.done);
+  const events = useMemo(
+    () =>
+      data.events
+        .filter((e) => e.date === today)
+        .sort((a, b) =>
+          (a.startTime ?? '').localeCompare(b.startTime ?? ''),
+        ),
+    [data.events, today],
+  );
 
-  const onAdd = () => {
-    if (!title.trim()) return;
-    addTask(title, areaId);
-    setTitle('');
+  const monthSpend = useMemo(
+    () =>
+      data.expenses
+        .filter((e) => monthKey(e.date) === month)
+        .reduce((s, e) => s + e.amount, 0),
+    [data.expenses, month],
+  );
+
+  const doneHabits = data.habits.filter((h) =>
+    isHabitOkOn(h, today),
+  ).length;
+
+  const onHabitPress = (id: string, done: boolean) => {
+    if (done) {
+      if (Platform.OS === 'ios') {
+        Alert.prompt(
+          'Нарушение',
+          'Почему не выполнил?',
+          (text) => {
+            if (text == null) return;
+            markHabitMiss(id, today, text.trim() || 'Не выполнено');
+          },
+          'plain-text',
+        );
+      } else {
+        Alert.alert('Отметить срыв?', 'Привычка станет красной на сегодня.', [
+          { text: 'Отмена', style: 'cancel' },
+          {
+            text: 'Срыв',
+            style: 'destructive',
+            onPress: () => markHabitMiss(id, today, 'Не выполнено'),
+          },
+        ]);
+      }
+      return;
+    }
+    clearHabitMiss(id, today);
   };
 
-  const confirmRemove = (id: string, label: string) => {
-    Alert.alert('Удалить?', label, [
-      { text: 'Отмена', style: 'cancel' },
-      { text: 'Удалить', style: 'destructive', onPress: () => removeTask(id) },
-    ]);
-  };
+  const dateLine = new Date().toLocaleDateString('ru-RU', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+  });
 
   return (
     <Screen>
-      <Title>Сегодня</Title>
-      <Subtitle>
-        {new Date().toLocaleDateString('ru-RU', {
-          weekday: 'long',
-          day: 'numeric',
-          month: 'long',
-        })}
-      </Subtitle>
+      <Header title="Сегодня" subtitle={dateLine} />
 
-      <View style={styles.addRow}>
-        <Field
-          style={styles.addField}
-          placeholder="Новая задача на сегодня"
-          value={title}
-          onChangeText={setTitle}
-          onSubmitEditing={onAdd}
-          returnKeyType="done"
-        />
-        <PrimaryButton label="+" onPress={onAdd} />
-      </View>
-
-      <View style={styles.chips}>
-        {LIFE_AREAS.map((a) => (
-          <Chip
-            key={a.id}
-            label={a.title}
-            color={a.color}
-            selected={areaId === a.id}
-            onPress={() => setAreaId(areaId === a.id ? undefined : a.id)}
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 40 }}
+      >
+        <View style={styles.metrics}>
+          <Metric value={String(openTasks.length)} label="задачи" />
+          <Metric value={String(events.length)} label="события" />
+          <Metric
+            value={`${doneHabits}/${data.habits.length || 0}`}
+            label="привычки"
           />
-        ))}
-      </View>
+        </View>
 
-      {data.habits.length > 0 && (
-        <View style={styles.block}>
-          <Text style={styles.blockTitle}>Привычки</Text>
-          {data.habits.map((h) => {
-            const done = h.completions.includes(today);
+        <Text style={styles.spendHint}>
+          Месяц · {formatMoney(monthSpend, baseCurrency)}
+        </Text>
+
+        <SectionLabel>Привычки</SectionLabel>
+        {data.habits.length === 0 ? (
+          <EmptyHint>Добавь привычки в разделе «Ещё».</EmptyHint>
+        ) : (
+          data.habits.map((h) => {
+            const done = isHabitOkOn(h, today);
             const area = LIFE_AREAS.find((a) => a.id === h.areaId);
             return (
-              <Row key={h.id} onPress={() => toggleHabitToday(h.id)}>
-                <View style={styles.habitRow}>
-                  <View
-                    style={[
-                      styles.check,
-                      done && { backgroundColor: colors.success },
-                    ]}
-                  />
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.itemTitle}>{h.title}</Text>
-                    {area && (
-                      <Text style={[styles.meta, { color: area.color }]}>
-                        {area.title}
-                      </Text>
-                    )}
+              <Row key={h.id} onPress={() => onHabitPress(h.id, done)}>
+                <View style={styles.line}>
+                  <Check done={done} />
+                  <View style={styles.lineBody}>
+                    <Text
+                      style={[styles.itemTitle, !done && styles.doneText]}
+                    >
+                      {h.title}
+                    </Text>
+                    <Text style={styles.meta}>
+                      {area?.title}
+                      {h.remindAt ? ` · ${h.remindAt}` : ''}
+                      {done ? '' : ' · срыв'}
+                    </Text>
                   </View>
                 </View>
               </Row>
             );
-          })}
-        </View>
-      )}
+          })
+        )}
 
-      <Text style={styles.blockTitle}>Задачи</Text>
-      <FlatList
-        data={[...openTasks, ...doneTasks]}
-        keyExtractor={(item) => item.id}
-        ListEmptyComponent={
-          <EmptyHint>Добавь первую задачу — планирование начнётся здесь.</EmptyHint>
-        }
-        renderItem={({ item }) => {
-          const area = LIFE_AREAS.find((a) => a.id === item.areaId);
-          return (
-            <Row
-              onPress={() => toggleTask(item.id)}
-              onLongPress={() => confirmRemove(item.id, item.title)}
-            >
-              <View style={styles.habitRow}>
-                <View
-                  style={[
-                    styles.check,
-                    item.done && { backgroundColor: colors.success },
-                  ]}
-                />
-                <View style={{ flex: 1 }}>
-                  <Text
-                    style={[
-                      styles.itemTitle,
-                      item.done && styles.itemDone,
-                    ]}
-                  >
-                    {item.title}
-                  </Text>
-                  {area && (
-                    <Text style={[styles.meta, { color: area.color }]}>
-                      {area.title}
-                    </Text>
-                  )}
-                </View>
-              </View>
+        <SectionLabel>События</SectionLabel>
+        {events.length === 0 ? (
+          <EmptyHint>Свободный день — событий нет.</EmptyHint>
+        ) : (
+          events.map((e) => (
+            <Row key={e.id}>
+              <Text style={styles.itemTitle}>{e.title}</Text>
+              <Text style={styles.meta}>
+                {e.allDay
+                  ? 'Весь день'
+                  : `${e.startTime ?? ''}${e.endTime ? `–${e.endTime}` : ''}`}
+              </Text>
             </Row>
-          );
-        }}
-        contentContainerStyle={{ paddingBottom: 40 }}
-      />
+          ))
+        )}
+
+        <SectionLabel>Задачи</SectionLabel>
+        {openTasks.length === 0 ? (
+          <EmptyHint>Всё закрыто. Можно выдохнуть.</EmptyHint>
+        ) : (
+          openTasks.map((item) => {
+            const area = LIFE_AREAS.find((a) => a.id === item.areaId);
+            return (
+              <Row key={item.id} onPress={() => void toggleTask(item.id)}>
+                <View style={styles.line}>
+                  <Check />
+                  <View style={styles.lineBody}>
+                    <View style={styles.titleRow}>
+                      <PriorityFlag priority={item.priority} />
+                      <Text style={styles.itemTitle}>{item.title}</Text>
+                    </View>
+                    <Text style={styles.meta}>
+                      {priorityMeta(item.priority).title}
+                      {area ? ` · ${area.title}` : ''}
+                      {item.dueDate ? ` · ${item.dueDate}` : ''}
+                    </Text>
+                  </View>
+                </View>
+              </Row>
+            );
+          })
+        )}
+      </ScrollView>
     </Screen>
   );
 }
 
+function Metric({ value, label }: { value: string; label: string }) {
+  return (
+    <View style={styles.metric}>
+      <Text style={styles.metricValue}>{value}</Text>
+      <Text style={styles.metricLabel}>{label}</Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
-  addRow: {
+  metrics: {
     flexDirection: 'row',
-    gap: 8,
+    gap: space.sm,
+    marginBottom: space.sm,
+  },
+  metric: {
+    flex: 1,
+    backgroundColor: colors.surface,
+    borderRadius: radii.lg,
+    paddingVertical: space.md,
+    paddingHorizontal: space.sm,
     alignItems: 'center',
-    marginBottom: 10,
   },
-  addField: { flex: 1 },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 8 },
-  block: { marginBottom: 8 },
-  blockTitle: {
+  metricValue: {
+    fontFamily: fonts.sansBold,
+    fontSize: 18,
+    color: colors.ink,
+  },
+  metricLabel: {
+    marginTop: 2,
+    fontFamily: fonts.sans,
+    fontSize: 11,
+    color: colors.faint,
+  },
+  spendHint: {
+    fontFamily: fonts.sans,
     fontSize: 13,
-    fontWeight: '700',
     color: colors.muted,
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
-    marginBottom: 8,
-    marginTop: 8,
+    marginBottom: space.sm,
   },
-  habitRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  check: {
-    width: 22,
-    height: 22,
-    borderRadius: 6,
-    borderWidth: 2,
-    borderColor: colors.line,
+  line: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  lineBody: { flex: 1 },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
-  itemTitle: { fontSize: 16, color: colors.ink, fontWeight: '500' },
-  itemDone: { textDecorationLine: 'line-through', color: colors.muted },
-  meta: { fontSize: 12, marginTop: 2, fontWeight: '600' },
+  itemTitle: {
+    flex: 1,
+    fontFamily: fonts.sansMedium,
+    fontSize: 16,
+    color: colors.ink,
+  },
+  doneText: { color: colors.muted, textDecorationLine: 'line-through' },
+  meta: {
+    marginTop: 2,
+    fontFamily: fonts.sans,
+    fontSize: 12,
+    color: colors.muted,
+  },
 });

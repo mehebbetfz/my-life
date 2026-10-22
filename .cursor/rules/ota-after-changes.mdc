@@ -1,0 +1,18 @@
+---
+description: Publish EAS OTA to production after finishing user feature/fix requests
+alwaysApply: true
+---
+
+# OTA after each request
+
+After completing a user request that changes app JS/TS, assets, or app config that ships via Expo Updates:
+
+1. Publish OTA to **both** `production` and `development` channels (user may open either build):
+   ```
+   npx eas-cli@latest update --channel production --environment production --message "<short summary>" --non-interactive
+   npx eas-cli@latest update --channel development --environment production --message "<short summary>" --non-interactive
+   ```
+2. Briefly tell the user the dashboard links when done.
+3. Skip OTA only for pure docs/rules, questions with no code changes, or when the user explicitly says not to publish.
+4. Native-only changes that need a new binary still need `eas build` — say so and still publish OTA for the JS part if any.
+5. Do **not** auto-`reloadAsync` on launch/AppState — it crashed users. Fetch in background and let the banner / manual install apply. Never add top-level imports of new native modules in code paths loaded at app start (lazy-import instead) unless a new native binary is shipped.
